@@ -1,6 +1,6 @@
 // Aula Magna 3D dello scontro finale, pensata come una discussione alla pari: il Prof. Palomba
-// cammina per la stanza (alla maniera dei peripatetici), si avvicina allo studente quando gli parla
-// e insieme ragionano sulle domande, attorno a un tavolino. Nessuna pedana e nessuna cattedra.
+// passeggia con calma attorno a un tavolino (alla maniera dei peripatetici), si ferma a guardare lo
+// studente quando gli parla e insieme ragionano sulle domande. Nessuna pedana e nessuna cattedra.
 import * as THREE from '../vendor/three.module.min.js';
 import { makeCharacter, animateCharacter, makePet, animatePet, box, mat } from './models.js';
 
@@ -119,8 +119,6 @@ export function createBossArena(canvas, { avatar, pet } = {}) {
 
   const prof = makeCharacter(PROF_AVATAR);
   prof.scale.setScalar(1.5);
-  let ang = 0;
-  prof.position.set(TABLE.x + Math.cos(ang) * R, 0, TABLE.y + Math.sin(ang) * R);
   scene.add(prof);
 
   const bulb = makeBulb();
@@ -131,11 +129,19 @@ export function createBossArena(canvas, { avatar, pet } = {}) {
   question.visible = false;
   scene.add(question);
 
-  // Il Prof gira attorno al tavolino (un angolo sul cerchio); quando parla si ferma di fianco allo studente.
+  // Il Prof passeggia piano attorno al tavolino, vicino a una posizione di riposo, e si ferma spesso.
+  // Quando parla si ferma dove si trova e si gira verso lo studente; solo a fine scontro gli va incontro.
+  const HOME = 0.35, WANDER = 0.7;
   const TALK_ANG = Math.atan2(0.3 - TABLE.y, -0.45 - TABLE.x);
   const fx = { talk: 0, bulb: 0, question: 0, nod: 0, end: null, endT: 0, phase: 1 };
-  let pause = 1.2, stepPhase = 0, targetAng = 0;
+  let ang = HOME, angVel = 0, pause = 4, stepPhase = 0, targetAng = HOME;
+  prof.position.set(TABLE.x + Math.cos(ang) * R, 0, TABLE.y + Math.sin(ang) * R);
   const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+  const pickTarget = () => {
+    let t = ang;
+    for (let i = 0; i < 6 && Math.abs(t - ang) < 0.3; i++) t = HOME + (Math.random() * 2 - 1) * WANDER;
+    return t;
+  };
 
   function layout() {
     const w = canvas.clientWidth || canvas.width, h = canvas.clientHeight || canvas.height;
@@ -166,40 +172,48 @@ export function createBossArena(canvas, { avatar, pet } = {}) {
     const talking = fx.talk > 0 || fx.end;
     fx.talk = Math.max(0, fx.talk - dt);
 
-    // --- il Prof cammina ---
-    const speed = fx.phase === 2 ? 1.25 : 0.85;
-    const goalAng = talking ? TALK_ANG : targetAng;
-    const da = angDiff(goalAng, ang);
+    // --- il Prof cammina, con calma ---
+    const speed = fx.phase === 2 ? 0.5 : 0.4; // metri al secondo: un passo tranquillo
     let moving = false, dist = 0;
-    if (fx.end && Math.abs(da) < 0.05) {
+    const walkArc = (goal) => {
+      // velocità angolare che accelera e frena dolcemente, così non ci sono scatti
+      const da = angDiff(goal, ang);
+      const want = Math.sign(da) * Math.min(speed / R, Math.abs(da) * 1.2);
+      angVel += (want - angVel) * Math.min(1, dt * 3);
+      const step = angVel * dt;
+      if (Math.abs(step) < 1e-4) return false;
+      ang += step;
+      const nx = TABLE.x + Math.cos(ang) * R, nz = TABLE.y + Math.sin(ang) * R;
+      turnTo(prof, nx + (nx - prof.position.x) * 20, nz + (nz - prof.position.z) * 20, Math.min(1, dt * 5));
+      prof.position.x = nx; prof.position.z = nz;
+      stepPhase = (stepPhase + Math.abs(step) * R / 0.55) % 1;
+      return Math.abs(angVel) * R > 0.04;
+    };
+    if (fx.end && Math.abs(angDiff(TALK_ANG, ang)) > 0.05) {
+      moving = walkArc(TALK_ANG);
+      dist = 1;
+    } else if (fx.end) {
       // a fine discussione si avvicina allo studente, fuori dal cerchio
+      angVel = 0;
       const goal = new THREE.Vector2(-0.65, 0.45);
       const pos = new THREE.Vector2(prof.position.x, prof.position.z);
       dist = pos.distanceTo(goal);
       if (dist > 0.05) {
         const step = Math.min(dist, speed * dt), dir = goal.clone().sub(pos).normalize();
         prof.position.x += dir.x * step; prof.position.z += dir.y * step;
-        turnTo(prof, goal.x, goal.y, Math.min(1, dt * 8));
+        turnTo(prof, goal.x, goal.y, Math.min(1, dt * 6));
         stepPhase = (stepPhase + step / 0.55) % 1;
         moving = true;
-      } else turnTo(prof, hero.position.x, hero.position.z, Math.min(1, dt * 6));
-    } else if (Math.abs(da) > 0.03) {
-      dist = 1;
-      const step = Math.sign(da) * Math.min(Math.abs(da), (speed / R) * dt);
-      ang += step;
-      const nx = TABLE.x + Math.cos(ang) * R, nz = TABLE.y + Math.sin(ang) * R;
-      turnTo(prof, nx + (nx - prof.position.x) * 20, nz + (nz - prof.position.z) * 20, Math.min(1, dt * 10));
-      prof.position.x = nx; prof.position.z = nz;
-      stepPhase = (stepPhase + Math.abs(step) * R / 0.55) % 1;
-      moving = true;
-    } else if (talking) {
-      turnTo(prof, hero.position.x, hero.position.z, Math.min(1, dt * 6));
-    } else if ((pause -= dt) <= 0) {
-      targetAng = ang + (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 1.6);
-      pause = 1 + Math.random() * 2;
+      } else turnTo(prof, hero.position.x, hero.position.z, Math.min(1, dt * 4));
+    } else if (talking || pause > 0) {
+      // fermo: frena se stava camminando e guarda lo studente
+      if (Math.abs(angVel) > 1e-3) moving = walkArc(ang); else angVel = 0;
+      if (!moving) turnTo(prof, hero.position.x, hero.position.z, Math.min(1, dt * (talking ? 5 : 2.5)));
+      if (!talking) pause -= dt;
+      if (pause <= 0 && !talking) targetAng = pickTarget();
     } else {
-      // in pausa: guarda lo studente, come chi sta pensando alla prossima domanda
-      turnTo(prof, hero.position.x, hero.position.z, Math.min(1, dt * 3));
+      moving = walkArc(targetAng);
+      if (Math.abs(angDiff(targetAng, ang)) < 0.02 && Math.abs(angVel) < 0.05) pause = 6 + Math.random() * 5;
     }
     animateCharacter(prof, stepPhase, moving, t);
     const arms = prof.userData.arms, head = prof.userData.head;

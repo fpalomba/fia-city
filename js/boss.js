@@ -5,7 +5,21 @@ import { el, say as sayBox, ask as askBox, toast } from './ui.js';
 import { sfx, music } from './audio.js';
 import { createBossArena } from './bossarena.js';
 
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// Estrae le battute senza ripeterle finché non sono state usate tutte, così il Prof non dice due volte di fila la stessa cosa.
+const bags = new Map();
+const pick = (arr) => {
+  if (!arr || !arr.length) return '';
+  let bag = bags.get(arr);
+  if (!bag || !bag.length) {
+    bag = arr.slice().sort(() => Math.random() - 0.5);
+    const last = bags.get(`${arr.length}:last`);
+    if (bag.length > 1 && bag[bag.length - 1] === last) bag.unshift(bag.pop());
+    bags.set(arr, bag);
+  }
+  const line = bag.pop();
+  bags.set(`${arr.length}:last`, line);
+  return line;
+};
 const fill = (s, name) => s.replace(/\{name\}/g, name);
 const fmt = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
 
@@ -117,14 +131,33 @@ function battle(run, world, progress, onClose, stage) {
     };
     renderStatus();
 
-    const talk = (text, ms = 2200) => new Promise((r) => {
+    // Fumetto del Prof. Resta visibile per ms millisecondi; un clic sul fumetto lo chiude prima.
+    let speechTimer = 0, speechDone = null;
+    const hideSpeech = () => {
+      clearTimeout(speechTimer);
+      speech.classList.add('hidden');
+      arena?.quiet();
+      if (speechDone) { const d = speechDone; speechDone = null; d(); }
+    };
+    speech.addEventListener('click', hideSpeech);
+    const showSpeech = (text, ms) => {
+      hideSpeech();
       speech.textContent = gx(text);
       speech.classList.remove('hidden');
       const head = arena?.profHead();
       if (head && head.w > 760) { speech.style.right = `${Math.round(head.w - head.x + 90)}px`; speech.style.bottom = `${Math.round(head.h - head.y - 20)}px`; }
       arena?.talk(ms / 1000);
-      setTimeout(() => { speech.classList.add('hidden'); r(); }, ms);
+      speechTimer = setTimeout(hideSpeech, ms);
+    };
+    const talk = (text, ms = 2600) => new Promise((r) => {
+      showSpeech(text, ms);
+      speechDone = r;
+      const onKey = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.removeEventListener('keydown', onKey); hideSpeech(); } };
+      setTimeout(() => window.addEventListener('keydown', onKey), 250);
+      const prev = speechDone;
+      speechDone = () => { window.removeEventListener('keydown', onKey); prev(); };
     });
+    let streak = 0;
 
     let raf = 0;
     let offKeys = () => {};
@@ -134,6 +167,7 @@ function battle(run, world, progress, onClose, stage) {
       try { q = await api.bossNext(); } catch (e) { toast(e.message); return end(); }
       Object.assign(state, q.run);
       renderStatus();
+      hideSpeech();
       const question = q.question;
       const lvl = world.levels.find((l) => l.id === question.level);
       qBox.innerHTML = '';
@@ -183,12 +217,21 @@ function battle(run, world, progress, onClose, stage) {
         }
         renderStatus();
         const finished = state.finished;
-        const line = r.correct ? pick(B.battle.onCorrect) : r.timedOut ? pick(B.battle.onTimeout) : pick(B.battle.onWrong);
-        await talk(r.healed ? `${line} (+${r.healed} HP)` : line, finished ? 1500 : 2600);
-        if (r.phaseChanged) {
-          await talk(B.battle.phase2, 4200);
+        streak = r.correct ? streak + 1 : 0;
+        if (finished) {
+          await talk(r.correct ? pick(B.battle.onCorrect) : pick(B.battle.onWrong), 1800);
+          return finish(r);
         }
-        if (finished) return finish(r);
+        // Battuta adatta al momento: serie di risposte giuste, ultimo cuore, vittoria vicina, cambio di fase.
+        let line;
+        if (r.phaseChanged) line = B.battle.phase2;
+        else if (r.correct && state.hp <= 20 && B.battle.onNearWin) line = pick(B.battle.onNearWin);
+        else if (r.correct && streak >= 3 && streak % 3 === 0 && B.battle.onStreak) line = pick(B.battle.onStreak);
+        else if (!r.correct && state.lives === 1 && B.battle.onLastLife) line = pick(B.battle.onLastLife);
+        else line = r.correct ? pick(B.battle.onCorrect) : r.timedOut ? pick(B.battle.onTimeout) : pick(B.battle.onWrong);
+        line = fill(line, progress.username);
+        showSpeech(r.healed ? `${line} (+${r.healed} HP)` : line, r.phaseChanged ? 6000 : 3500);
+        if (r.phaseChanged) fbLine.append(el('div', { class: 'muted', style: 'margin-top:6px' }, `⚡ Fase 2: ${(world.boss && world.boss.config && world.boss.config.phase2TimeLimitSec) || 18} secondi per domanda, e ogni errore fa recuperare HP al Prof.`));
         await waitContinue();
         nextQuestion();
       }

@@ -52,21 +52,21 @@ Le scelte nei dialoghi si fanno con il mouse, toccandole, oppure con le frecce p
 
 ### Quartieri
 
-- La città è divisa in quartieri, uno per ogni gruppo di lezioni. Si parte dal **Quartiere delle Origini** (introduzione all'IA e agenti intelligenti).
-- Un quartiere si apre quando hai **tutti i badge del quartiere precedente**. I quartieri con il cantiere aprono man mano che il corso va avanti.
+- La città è divisa in sette quartieri, uno per ogni gruppo di lezioni, con 42 edifici in tutto. Si parte dal **Quartiere delle Origini** (introduzione all'IA e agenti intelligenti) e si arriva al **Porto della Ricerca e Apprendimento**.
+- Un quartiere si apre quando hai **tutti i badge del quartiere precedente**: si procede in ordine, dal primo al settimo.
 
 ### Il Test Finale (boss)
 
-- L'Aula Magna si apre quando hai tutti i badge dei quartieri attivi. Dentro ti aspetta il Prof. Palomba.
+- L'Aula Magna si apre solo quando hai **tutti i badge di tutti e sette i quartieri**. Dentro ti aspetta il Prof. Palomba.
 - Prima dello scontro il Prof ti chiede se hai letto tutte le slide e se hai dubbi. **Le tue risposte vengono registrate e il docente le vede**: se dici di avere dubbi, ti invita a contattarlo.
 - Il Prof ha 100 punti vita e ogni risposta giusta gliene toglie 10. Tu hai **3 cuori**: ogni risposta sbagliata o tempo scaduto ne costa uno.
 - Hai **25 secondi** per domanda. Sotto metà vita il Prof passa alla **fase 2**: 18 secondi per domanda, e ogni tuo errore gli fa recuperare 10 punti vita.
-- Le domande sono a scelta multipla e riguardano **tutti** i quartieri attivi.
+- Le domande sono a scelta multipla e riguardano **tutti** i quartieri.
 - Se perdi puoi riprovare quando vuoi. Se vinci puoi rigiocare per gloria: il voto non cambia.
 
 ### Il voto calcolato dal gioco
 
-- **Media dei quiz:** la media dei voti di tutti gli edifici dei quartieri attivi, cioè il primo tentativo completato di ciascuno, riportata in trentesimi. Un edificio mai completato vale 0.
+- **Media dei quiz:** la media dei voti di tutti i 42 edifici, cioè il primo tentativo completato di ciascuno, riportata in trentesimi. Un edificio mai completato vale 0.
 - **Voto finale** = (30 + media dei quiz in trentesimi) / 2. Si registra **alla prima vittoria** contro il Prof.
 - Esempio: con una media dei quiz di 24/30, il voto finale è (30 + 24) / 2 = 27.
 - Nello Zaino trovi badge, voto di ogni edificio e voto previsto.
